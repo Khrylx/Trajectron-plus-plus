@@ -44,9 +44,9 @@ parser.add_argument('--use_map_encoding', help="Whether to use map encoding or n
 parser.add_argument("--data_dir", help="what dir to look in for data",
                     type=str, default='../data/processed')
 parser.add_argument("--train_data_dict", help="what file to load for training data",
-                    type=str, default='nuScenes_train.pkl')
+                    type=str, default='nuScenes_samples.pkl')
 parser.add_argument("--eval_data_dict", help="what file to load for evaluation data",
-                    type=str, default='nuScenes_val.pkl')
+                    type=str, default='nuScenes_samples.pkl')
 parser.add_argument("--log_dir", help="what dir to save training information (i.e., saved models, logs, etc)",
                     type=str, default='../data/nuScenes/logs')
 parser.add_argument("--log_tag", help="tag for the log folder",
