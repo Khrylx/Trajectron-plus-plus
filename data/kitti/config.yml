@@ -71,7 +71,7 @@ print_freq                   : 20
 model_save_freq              : 1
 # save_dir                     : /mnt/hdd2/xinshuo/models/GNNTrkForecast
 save_dir                     : /home/yyuan2/results/gnntrk_forecast
-purturb_ratio                : 0.1
+purturb_ratio                : 0.0
 # purturb_ratio                : 0
 # drop_ratio_train             : 0.5
 mask                         : false

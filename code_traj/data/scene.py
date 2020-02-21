@@ -69,9 +69,9 @@ class Scene(object):
             if node.is_robot and not include_robot:
                 continue
             if type is None or node.type == type:
-                if curve and node.type.name == 'VEHICLE':
-                    if 'curve' not in node.description and np.random.rand() > 0.1:
-                        continue
+                # if curve and node.type.name == 'VEHICLE':
+                #     if 'curve' not in node.description and np.random.rand() > 0.1:
+                #         continue
                 lower_bound = timesteps - min_history_timesteps
                 upper_bound = timesteps + min_future_timesteps
                 mask = (node.first_timestep <= lower_bound) & (upper_bound <= node.last_timestep)

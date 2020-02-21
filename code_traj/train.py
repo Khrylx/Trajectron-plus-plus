@@ -44,16 +44,16 @@ parser.add_argument('--use_map_encoding', help="Whether to use map encoding or n
 parser.add_argument("--data_dir", help="what dir to look in for data",
                     type=str, default='../data/processed')
 parser.add_argument("--train_data_dict", help="what file to load for training data",
-                    type=str, default='nuScenes_samples.pkl')
+                    type=str, default='kitti_train_v1.pkl')
 parser.add_argument("--eval_data_dict", help="what file to load for evaluation data",
-                    type=str, default='nuScenes_samples.pkl')
+                    type=str, default='kitti_eval_v1.pkl')
 parser.add_argument("--log_dir", help="what dir to save training information (i.e., saved models, logs, etc)",
-                    type=str, default='../data/nuScenes/logs')
+                    type=str, default='../data/kitti/logs')
 parser.add_argument("--log_tag", help="tag for the log folder",
                     type=str, default='')
 
 parser.add_argument('--device', help='what device to perform training on',
-                    type=str, default='cuda:1')
+                    type=str, default='cuda:0')
 parser.add_argument("--eval_device", help="what device to use during evaluation",
                     type=str, default=None)
 
@@ -71,9 +71,9 @@ parser.add_argument('--k_eval', help='how many samples to take during evaluation
 parser.add_argument('--seed', help='manual seed to use, default is 123',
                     type=int, default=123)
 parser.add_argument('--eval_every', help='how often to evaluate during training, never if None',
-                    type=int, default=50)
+                    type=int, default=None)
 parser.add_argument('--vis_every', help='how often to visualize during training, never if None',
-                    type=int, default=50)
+                    type=int, default=None)
 parser.add_argument('--save_every', help='how often to save during training, never if None',
                     type=int, default=100)
 args = parser.parse_args()
@@ -242,10 +242,10 @@ def main():
         train_losses = dict()
         for node_type in train_env.NodeType:
             train_losses[node_type] = []
-        for scene in np.random.choice(train_scenes, 10):
+        for scene in np.random.choice(train_scenes, hyperparams['batch_size']):
             for mb_num in range(args.batch_multiplier):
                 # Obtaining the batch's training loss.
-                timesteps = scene.sample_timesteps(hyperparams['batch_size'])
+                timesteps = np.array([hyperparams['maximum_history_length']])
 
                 # Compute the training loss.
                 train_loss_by_type = stg.train_loss(scene, timesteps, max_nodes=hyperparams['batch_size'])

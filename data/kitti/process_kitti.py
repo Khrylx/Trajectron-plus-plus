@@ -117,11 +117,15 @@ if __name__ == "__main__":
     """data"""
     cfg, settings_show = Config('config.yml')
     log = open('log.txt', 'w')
-    generator = data_generator(cfg, log, split='train', phase='training')
 
-    for data_class in ['train']:
+    for data_class in ['train', 'val']:
         print(f"Processing data class {data_class}")
-        data_dict_path = os.path.join('../processed', '_'.join(['kitti', data_class])+ 'test.pkl')
+        if data_class == 'train':
+            generator = data_generator(cfg, log, split='train', phase='training')
+        else:
+            generator = data_generator(cfg, log, split='val', phase='testing', test_type='forecast')
+
+        data_dict_path = os.path.join('../processed', '_'.join(['kitti', data_class, 'v1.pkl']))
         env = Environment(node_type_list=types, standardization=standardization)
         attention_radius = dict()
         attention_radius[(env.NodeType.PEDESTRIAN, env.NodeType.PEDESTRIAN)] = 3.0
@@ -140,6 +144,7 @@ if __name__ == "__main__":
             if data[0] is None:
                 continue
             
+            print(generator.index)
             cur_motion_3D, pre_motion_3D, fut_motion_3D, fut_motion_mask, \
             pre_data, fut_data, gt_matrix, seq_name, frame = data
             all_data = pre_data + fut_data[1:]
@@ -161,7 +166,7 @@ if __name__ == "__main__":
                     continue
                 
                 for obj in cur_data:
-                    data_point = pd.Series({'frame_id': int(obj[0]),
+                    data_point = pd.Series({'frame_id': frame_id,
                                             'type': env.NodeType.VEHICLE,
                                             'node_id': int(obj[1]),
                                             'robot': False,
@@ -196,13 +201,13 @@ if __name__ == "__main__":
 
             # Generate Maps
 
-            type_map = dict()
-            homography = np.array([[3., 0., 0.], [0., 3., 0.], [0., 0., 3.]])
-           # VEHICLES
-            map_mask_vehicle = np.zeros((783, 804, 3))
-            type_map['VEHICLE'] = Map(data=map_mask_vehicle, homography=homography, description='')
-            scene.map = type_map
-            del map_mask_vehicle
+        #     type_map = dict()
+        #     homography = np.array([[3., 0., 0.], [0., 3., 0.], [0., 0., 3.]])
+        #    # VEHICLES
+        #     map_mask_vehicle = np.zeros((783, 804, 3))
+        #     type_map['VEHICLE'] = Map(data=map_mask_vehicle, homography=homography, description='')
+        #     scene.map = type_map
+        #     del map_mask_vehicle
 
             for node_id in pd.unique(data['node_id']):
                 node_df = data[data['node_id'] == node_id]
@@ -322,13 +327,18 @@ if __name__ == "__main__":
             else:
                 scene.description = "straight"
 
-            scenes.append(scene)
+            if len(scene.nodes) > 0:
+                scenes.append(scene)
 
             del data
+
+            # if len(scenes) > 5:
+            #     break
 
         env.scenes = scenes
 
         if len(scenes) > 0:
+            print(f'{data_class} num_scenes: {len(scenes)}')
             with open(data_dict_path, 'wb') as f:
                 pickle.dump(env, f, protocol=pickle.HIGHEST_PROTOCOL)
 

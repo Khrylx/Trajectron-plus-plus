@@ -8,9 +8,9 @@
   "min_learning_rate": 0.0005,
   "learning_decay_rate": 0.9995,
 
-  "prediction_horizon": 6,
+  "prediction_horizon": 10,
   "minimum_history_length": 1,
-  "maximum_history_length": 8,
+  "maximum_history_length": 9,
 
   "map_context": 120,
   "map_enc_num_layers": 4,
