@@ -203,7 +203,7 @@ def main():
     print('Created training STG model.')
 
     eval_stg = None
-    if args.eval_every is not None or args.vis_ervery is not None:
+    if args.eval_every is not None or args.vis_every is not None:
         eval_stg = SpatioTemporalGraphCVAEModel(model_registrar,
                                                 hyperparams,
                                                 log_writer, args.device)
