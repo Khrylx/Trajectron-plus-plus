@@ -139,13 +139,10 @@ if __name__ == "__main__":
             data = generator()
             if data[0] is None:
                 continue
-
-            scene_id = int(nuscene['name'].replace('scene-', ''))
-            if scene_id in scene_blacklist: # Some scenes have bad localization
-                continue
-
-            if not (scene_id == 1002 or scene_id == 234):
-                continue
+            
+            cur_motion_3D, pre_motion_3D, fut_motion_3D, fut_motion_mask, \
+            pre_data, fut_data, gt_matrix, seq_name, frame = data
+            all_data = pre_data + fut_data[1:]
 
             data = pd.DataFrame(columns=['frame_id',
                                          'type',
@@ -158,80 +155,26 @@ if __name__ == "__main__":
                                          'heading',
                                          'orientation'])
 
-            sample_token = nuscene['first_sample_token']
-            sample = nusc.get('sample', sample_token)
             frame_id = 0
-            while sample['next']:
-                if not test:
-                    annotation_tokens = sample['anns']
-                else:
-                    annotation_tokens = test_annotations['results'][sample['token']]
-                for annotation_token in annotation_tokens:
-                    if not test:
-                        annotation = nusc.get('sample_annotation', annotation_token)
-                        category = annotation['category_name']
-                        if len(annotation['attribute_tokens']):
-                            attribute = nusc.get('attribute', annotation['attribute_tokens'][0])['name']
-
-                        if 'pedestrian' in category and not 'stroller' in category and not 'wheelchair' in category:
-                            our_category = env.NodeType.PEDESTRIAN
-                        elif ('vehicle.bicycle' in category) and 'with_rider' in attribute:
-                            continue
-                            our_category = env.NodeType.BICYCLE
-                        elif 'vehicle' in category and 'bicycle' not in category and 'motorcycle' not in category and 'parked' not in attribute:
-                            our_category = env.NodeType.VEHICLE
-                        # elif ('vehicle.motorcycle' in category) and 'with_rider' in attribute:
-                        # our_category = env.NodeType.VEHICLE
-                        else:
-                            continue
-                    else:
-                        annotation = annotation_token
-                        category = annotation['tracking_name']
-                        attribute = ""#annotation['attribute_name']
-
-                        if 'pedestrian' in category :
-                            our_category = env.NodeType.PEDESTRIAN
-                        elif (('car' in category or 'bus' in category or 'construction_vehicle' in category) and 'parked' not in attribute):
-                            our_category = env.NodeType.VEHICLE
-                        # elif ('vehicle.motorcycle' in category) and 'with_rider' in attribute:
-                        # our_category = env.NodeType.VEHICLE
-                        else:
-                            continue
-
-
-                    data_point = pd.Series({'frame_id': frame_id,
-                                            'type': our_category,
-                                            'node_id': annotation['instance_token'] if not test else annotation['tracking_id'],
+            for cur_data in all_data:
+                if len(cur_data) == 0:
+                    continue
+                
+                for obj in cur_data:
+                    data_point = pd.Series({'frame_id': int(obj[0]),
+                                            'type': env.NodeType.VEHICLE,
+                                            'node_id': int(obj[1]),
                                             'robot': False,
-                                            'x': annotation['translation'][0],
-                                            'y': annotation['translation'][1],
-                                            'z': annotation['translation'][2],
-                                            'length': annotation['size'][0],
-                                            'width': annotation['size'][1],
-                                            'height': annotation['size'][2],
-                                            'heading': Quaternion(annotation['rotation']).yaw_pitch_roll[0],
+                                            'x': obj[13],
+                                            'y': obj[14],
+                                            'z': obj[15],
+                                            'length': obj[12],
+                                            'width': obj[11],
+                                            'height': obj[10],
+                                            'heading': obj[16],
                                             'orientation': None})
                     data = data.append(data_point, ignore_index=True)
 
-                # Ego Vehicle
-                our_category = env.NodeType.VEHICLE
-                sample_data = nusc.get('sample_data', sample['data']['CAM_FRONT'])
-                annotation = nusc.get('ego_pose', sample_data['ego_pose_token'])
-                data_point = pd.Series({'frame_id': frame_id,
-                                        'type': our_category,
-                                        'node_id': 'ego',
-                                        'robot': True,
-                                        'x': annotation['translation'][0],
-                                        'y': annotation['translation'][1],
-                                        'z': annotation['translation'][2],
-                                        'length': 4,
-                                        'width': 1.7,
-                                        'height': 1.5,
-                                        'heading': Quaternion(annotation['rotation']).yaw_pitch_roll[0],
-                                        'orientation': None})
-                data = data.append(data_point, ignore_index=True)
-
-                sample = nusc.get('sample', sample['next'])
                 frame_id += 1
 
             if len(data.index) == 0:
@@ -248,45 +191,18 @@ if __name__ == "__main__":
             data['x'] = data['x'] - x_min
             data['y'] = data['y'] - y_min
 
-            scene = Scene(timesteps=max_timesteps + 1, dt=0.5, name=str(scene_id))
+            scene_id = f"{seq_name}_{frame}"
+            scene = Scene(timesteps=max_timesteps + 1, dt=1.0, name=scene_id)
 
             # Generate Maps
-            map_name = nusc.get('log', nuscene['log_token'])['location']
-            nusc_map = NuScenesMap(dataroot=data_path, map_name=map_name)
 
             type_map = dict()
-            x_size = x_max - x_min
-            y_size = y_max - y_min
-            patch_box = (x_min + 0.5 * (x_max - x_min), y_min + 0.5 * (y_max - y_min), y_size, x_size)
-            patch_angle = 0  # Default orientation where North is up
-            canvas_size = (np.round(3 * y_size).astype(int), np.round(3 * x_size).astype(int))
             homography = np.array([[3., 0., 0.], [0., 3., 0.], [0., 0., 3.]])
-            layer_names = ['lane', 'road_segment', 'drivable_area', 'road_divider', 'lane_divider', 'stop_line',
-                           'ped_crossing', 'stop_line', 'ped_crossing', 'walkway']
-            map_mask = (nusc_map.get_map_mask(patch_box, patch_angle, layer_names, canvas_size) * 255.0).astype(
-                np.uint8)
-            map_mask = np.swapaxes(map_mask, 1, 2) # x axis comes first
-            # PEDESTRIANS
-            map_mask_pedestrian = np.stack((map_mask[9], map_mask[8], np.max(map_mask[:3], axis=0)), axis=2)
-            type_map['PEDESTRIAN'] = Map(data=map_mask_pedestrian, homography=homography,
-                                         description=', '.join(layer_names))
-            # Bicycles
-            map_mask_bicycles = np.stack((map_mask[9], map_mask[8], np.max(map_mask[:3], axis=0)), axis=2)
-            type_map['BICYCLE'] = Map(data=map_mask_bicycles, homography=homography, description=', '.join(layer_names))
-            # VEHICLES
-            map_mask_vehicle = np.stack((np.max(map_mask[:3], axis=0), map_mask[3], map_mask[4]), axis=2)
-            type_map['VEHICLE'] = Map(data=map_mask_vehicle, homography=homography, description=', '.join(layer_names))
-
-            map_mask_plot = np.stack(((np.max(map_mask[:3], axis=0) - (map_mask[3] + 0.5 * map_mask[4]).clip(
-                max=255)).clip(min=0).astype(np.uint8), map_mask[8], map_mask[9]), axis=2)
-            type_map['PLOT'] = Map(data=map_mask_plot, homography=homography, description=', '.join(layer_names))
-
+           # VEHICLES
+            map_mask_vehicle = np.zeros((783, 804, 3))
+            type_map['VEHICLE'] = Map(data=map_mask_vehicle, homography=homography, description='')
             scene.map = type_map
-            del map_mask
-            del map_mask_pedestrian
             del map_mask_vehicle
-            del map_mask_bicycles
-            del map_mask_plot
 
             for node_id in pd.unique(data['node_id']):
                 node_df = data[data['node_id'] == node_id]
@@ -329,32 +245,7 @@ if __name__ == "__main__":
                     node.is_robot = True
 
                 if node_df.iloc[0]['type'] == env.NodeType.PEDESTRIAN:
-                    filter_ped = LinearPointMass(dt=scene.dt)
-                    for i in range(len(node.position.x)):
-                        if i == 0:  # initalize KF
-                            P_matrix = np.identity(4)
-                        elif i < len(node.position.x):
-                            # assign new est values
-                            node.position.x[i] = x_vec_est_new[0][0]
-                            node.velocity.x[i] = x_vec_est_new[1][0]
-                            node.position.y[i] = x_vec_est_new[2][0]
-                            node.velocity.y[i] = x_vec_est_new[3][0]
-
-                        if i < len(node.position.x) - 1:  # no action on last data
-                            # filtering
-                            x_vec_est = np.array([[node.position.x[i]],
-                                                  [node.velocity.x[i]],
-                                                  [node.position.y[i]],
-                                                  [node.velocity.y[i]]])
-                            z_new = np.array([[node.position.x[i+1]],
-                                              [node.position.y[i+1]]])
-                            x_vec_est_new, P_matrix_new = filter_ped.predict_and_update(
-                                x_vec_est=x_vec_est,
-                                u_vec=np.array([[0.], [0.]]),
-                                P_matrix=P_matrix,
-                                z_new=z_new
-                            )
-                            P_matrix = P_matrix_new
+                    pass
                 else:
                     filter_veh = NonlinearKinematicBicycle(lf=node.length*0.6, lr=node.length*0.4, dt=scene.dt)
                     for i in range(len(node.position.x)):
@@ -397,28 +288,6 @@ if __name__ == "__main__":
                 node.heading.derivative = np.gradient(node.heading.value, scene.dt)
                 node.heading.value = (node.heading.value + np.pi) % (2.0 * np.pi) - np.pi
 
-                if node_df.iloc[0]['type'] == env.NodeType.VEHICLE:
-                    node_pos = np.stack((node.position.x, node.position.y), axis=1)
-                    node_pos_map = scene.map[env.NodeType.VEHICLE.name].to_map_points(node_pos)
-                    node_pos_int = np.round(node_pos_map).astype(int)
-                    dilated_map = binary_dilation(scene.map[env.NodeType.VEHICLE.name].data[..., 0], generate_binary_structure(2, 2))
-                    if np.sum((dilated_map[node_pos_int[:, 0], node_pos_int[:, 1]] == 0))/node_pos_int.shape[0] > 0.1:
-                        del node
-                        continue # Out of map
-
-
-
-                if not node_df.iloc[0]['type'] == env.NodeType.PEDESTRIAN:
-                    # Re Integrate:
-                    i_pos = integrate_heading_model(np.array([node.acceleration.m[1:]]),
-                                            np.array([node.heading.derivative[1:]]),
-                                            node.heading.value[0],
-                                            np.vstack((node.position.x[0], node.position.y[0])),
-                                            node.velocity.m[0], 0.5)
-
-
-                    #if (np.abs(node.heading.derivative) > np.pi/8).any():
-                    #    print(np.abs(node.heading.derivative).max())
                 scene.nodes.append(node)
                 if node.is_robot is True:
                     scene.robot = node
@@ -453,9 +322,7 @@ if __name__ == "__main__":
             else:
                 scene.description = "straight"
 
-            if robot: # If we dont have a ego vehicle there was bad localization
-                pbar.set_description(str(scene))
-                scenes.append(scene)
+            scenes.append(scene)
 
             del data
 
