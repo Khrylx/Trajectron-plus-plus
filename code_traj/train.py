@@ -251,7 +251,7 @@ def main():
                 train_loss_by_type = stg.train_loss(scene, timesteps, max_nodes=hyperparams['batch_size'])
                 for node_type, train_loss in train_loss_by_type.items():
                     if train_loss is not None:
-                        train_loss = train_loss / (args.batch_multiplier * 10)
+                        train_loss = train_loss / (args.batch_multiplier * hyperparams['batch_size'])
                         train_losses[node_type].append(train_loss.item())
 
                         # Calculating gradients.
