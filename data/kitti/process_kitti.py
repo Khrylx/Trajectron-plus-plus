@@ -212,7 +212,7 @@ if __name__ == "__main__":
                                             'height': obj[10],
                                             'heading': obj[16],
                                             'orientation': None})
-                    data = data.append(data_point, ignore_index=True)
+                data = data.append(data_point, ignore_index=True)
 
 
             if len(data.index) == 0:
