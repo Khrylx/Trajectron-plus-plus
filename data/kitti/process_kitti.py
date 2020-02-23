@@ -117,6 +117,7 @@ if __name__ == "__main__":
     """data"""
     cfg, settings_show = Config('config.yml')
     log = open('log.txt', 'w')
+    ph = cfg.past_frames
 
     for data_class in ['train', 'val']:
         print(f"Processing data class {data_class}")
@@ -125,7 +126,7 @@ if __name__ == "__main__":
         else:
             generator = data_generator(cfg, log, split='val', phase='testing', test_type='forecast')
 
-        data_dict_path = os.path.join('../processed', '_'.join(['kitti', data_class, 'v1.pkl']))
+        data_dict_path = os.path.join('../processed', '_'.join(['kitti', data_class, f'ph{ph}', 'v1.pkl']))
         env = Environment(node_type_list=types, standardization=standardization)
         attention_radius = dict()
         attention_radius[(env.NodeType.PEDESTRIAN, env.NodeType.PEDESTRIAN)] = 3.0
@@ -147,7 +148,44 @@ if __name__ == "__main__":
             print(generator.index)
             cur_motion_3D, pre_motion_3D, fut_motion_3D, fut_motion_mask, \
             pre_data, fut_data, gt_matrix, seq_name, frame = data
-            all_data = pre_data + fut_data[1:]
+
+            start_data = pre_data[0]
+            """pre_data""" 
+            all_arr = []
+            for i in range(start_data.shape[0]):    # number of objects in the most recent frame
+                identity = start_data[i, 1]
+
+                # """past frames for debug""" 
+                most_recent_data = start_data[i].copy()
+                first_data = start_data[i].copy()
+                first_data[0] = ph
+                past_arr = [start_data[i]]
+                for j in range(1, cfg.past_frames):
+                    cur_data = pre_data[j]              # past_data
+                    if len(cur_data) > 0 and identity in cur_data[:, 1]:
+                        data = cur_data[cur_data[:, 1] == identity].squeeze()
+                    else:
+                        # print('past missing', identity, ph - 1 - j)
+                        data = most_recent_data.copy()
+                    data[0] = ph - 1 - j
+                    most_recent_data = data.copy()
+                    past_arr.insert(0, data)
+                all_arr += past_arr
+
+                """future frames"""
+                most_recent_data = start_data[i].copy()
+                for j in range(1, cfg.future_frames + 1):
+                    cur_data = fut_data[j]
+                    if len(cur_data) > 0 and identity in cur_data[:, 1]:
+                        data = cur_data[cur_data[:, 1] == identity].squeeze()
+                    else:
+                        # print('missing', identity, ph - 1 + j)
+                        data = most_recent_data.copy()
+                    data[0] = ph - 1 + j
+                    most_recent_data = data.copy()
+                    all_arr.append(data)
+
+            all_data = np.vstack(all_arr)
 
             data = pd.DataFrame(columns=['frame_id',
                                          'type',
@@ -160,19 +198,15 @@ if __name__ == "__main__":
                                          'heading',
                                          'orientation'])
 
-            frame_id = 0
-            for cur_data in all_data:
-                if len(cur_data) == 0:
-                    continue
+            for obj in all_data:
                 
-                for obj in cur_data:
-                    data_point = pd.Series({'frame_id': frame_id,
+                data_point = pd.Series({'frame_id': int(obj[0]),
                                             'type': env.NodeType.VEHICLE,
                                             'node_id': int(obj[1]),
                                             'robot': False,
                                             'x': obj[13],
-                                            'y': obj[14],
-                                            'z': obj[15],
+                                        'y': obj[15],
+                                        'z': obj[14],
                                             'length': obj[12],
                                             'width': obj[11],
                                             'height': obj[10],
@@ -180,7 +214,6 @@ if __name__ == "__main__":
                                             'orientation': None})
                     data = data.append(data_point, ignore_index=True)
 
-                frame_id += 1
 
             if len(data.index) == 0:
                 continue
@@ -188,13 +221,13 @@ if __name__ == "__main__":
             data.sort_values('frame_id', inplace=True)
             max_timesteps = data['frame_id'].max()
 
-            x_min = np.round(data['x'].min() - 50)
-            x_max = np.round(data['x'].max() + 50)
-            y_min = np.round(data['y'].min() - 50)
-            y_max = np.round(data['y'].max() + 50)
+            # x_min = np.round(data['x'].min() - 50)
+            # x_max = np.round(data['x'].max() + 50)
+            # y_min = np.round(data['y'].min() - 50)
+            # y_max = np.round(data['y'].max() + 50)
 
-            data['x'] = data['x'] - x_min
-            data['y'] = data['y'] - y_min
+            # data['x'] = data['x'] - x_min
+            # data['y'] = data['y'] - y_min
 
             scene_id = f"{seq_name}_{frame}"
             scene = Scene(timesteps=max_timesteps + 1, dt=1.0, name=scene_id)

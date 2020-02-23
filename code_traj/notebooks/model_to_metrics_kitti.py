@@ -1,5 +1,5 @@
 import sys
-sys.path.append('../../code')
+sys.path.append('../../code_traj')
 import os
 import pickle
 import json
@@ -15,11 +15,11 @@ from utils import prediction_output_to_trajectories
 from scipy.interpolate import RectBivariateSpline
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--model", help="model full path", type=str)
-parser.add_argument("--checkpoint", help="model checkpoint to evaluate", type=int)
-parser.add_argument("--data", help="full path to data file", type=str)
+parser.add_argument("--model", help="model full path", type=str, default='../../data/kitti/logs/models_21_Feb_2020_17_48_26')
+parser.add_argument("--checkpoint", help="model checkpoint to evaluate", type=int, default=1999)
+parser.add_argument("--data", help="full path to data file", type=str, default='../../data/processed/kitti_val_v1.pkl')
 parser.add_argument("--output", help="full path to output csv file", type=str)
-parser.add_argument("--node_type", help="Node Type to evaluate", type=str)
+parser.add_argument("--node_type", help="Node Type to evaluate", type=str, default='VEHICLE')
 parser.add_argument("--prediction_horizon", nargs='+', help="prediction horizon", type=int, default=None)
 args = parser.parse_args()
 
@@ -82,7 +82,7 @@ if __name__ == "__main__":
 
     print("-- Preparing Node Graph")
     for scene in tqdm(scenes):
-        scene.calculate_scene_graph(hyperparams['edge_radius'],
+        scene.calculate_scene_graph(env.attention_radius,
                                     hyperparams['state'],
                                     hyperparams['edge_addition_filter'],
                                     hyperparams['edge_removal_filter'])
@@ -110,7 +110,7 @@ if __name__ == "__main__":
                                                    ph,
                                                    num_samples_z=2000,
                                                    most_likely_z=False,
-                                                   min_future_timesteps=8)
+                                                   min_future_timesteps=ph)
 
                     if not predictions:
                         continue
@@ -120,8 +120,8 @@ if __name__ == "__main__":
                                                                           node_type_enum=env.NodeType,
                                                                           max_hl=max_hl,
                                                                           ph=ph,
-                                                                          map=scene.map[node_type.name],
-                                                                          obs=True)
+                                                                          map=None,
+                                                                          obs=False)
 
                     eval_ade_batch_errors = np.hstack((eval_ade_batch_errors, eval_error_dict[node_type]['ade']))
                     eval_fde_batch_errors = np.hstack((eval_fde_batch_errors, eval_error_dict[node_type]['fde']))
@@ -133,50 +133,7 @@ if __name__ == "__main__":
 
             print(f"Final Mean Displacement Error @{ph * scene.dt}s: {np.mean(eval_fde_batch_errors)}")
             print(f"Road Violations @{ph * scene.dt}s: {100 * np.sum(eval_obs_viols) / (eval_obs_viols.shape[0] * 2000)}%")
-            pd.DataFrame({'error_value': eval_ade_batch_errors, 'error_type': 'ade', 'type': 'full', 'ph': ph}).to_csv(args.output + '_ade_full_' + str(ph)+'ph' + '.csv')
-            pd.DataFrame({'error_value': eval_fde_batch_errors, 'error_type': 'fde', 'type': 'full', 'ph': ph}).to_csv(args.output + '_fde_full' + str(ph)+'ph' + '.csv')
-            pd.DataFrame({'error_value': eval_kde_nll, 'error_type': 'kde', 'type': 'full', 'ph': ph}).to_csv(args.output + '_kde_full' + str(ph)+'ph' + '.csv')
-            pd.DataFrame({'error_value': eval_obs_viols, 'error_type': 'obs', 'type': 'full', 'ph': ph}).to_csv(args.output + '_obs_full' + str(ph)+'ph' + '.csv')
-
-            eval_ade_batch_errors = np.array([])
-            eval_fde_batch_errors = np.array([])
-            eval_heading_err = np.array([])
-            eval_obs_viols = np.array([])
-            print("-- Evaluating most likely Z and GMM")
-            for i, scene in enumerate(scenes):
-                print(f"---- Evaluating Scene {i+1}/{len(scenes)}")
-                for t in np.arange(0, scene.timesteps, 20):
-                    timesteps = np.arange(t, t+20)
-
-                    predictions = eval_stg.predict(scene,
-                                                   timesteps,
-                                                   ph,
-                                                   num_samples_z=1,
-                                                   most_likely_z=True,
-                                                   most_likely_gmm=True,
-                                                   min_future_timesteps=8)
-
-                    eval_error_dict = evaluation.compute_batch_statistics(predictions,
-                                                              scene.dt,
-                                                                          node_type_enum=env.NodeType,
-                                                              max_hl=max_hl,
-                                                              ph=ph,
-                                                              map=1 - scene.map[node_type.name].fdata[..., 0],
-                                                              kde=False)
-                    eval_ade_batch_errors = np.hstack((eval_ade_batch_errors, eval_error_dict[node_type]['ade']))
-                    eval_fde_batch_errors = np.hstack((eval_fde_batch_errors, eval_error_dict[node_type]['fde']))
-                    eval_obs_viols = np.hstack((eval_obs_viols, eval_error_dict[node_type]['obs_viols']))
-
-                    heading_error = compute_heading_error(predictions,
-                                                              scene.dt,
-                                                            node_type_enum=env.NodeType,
-                                                              max_hl=max_hl,
-                                                              ph=ph,
-                                                              map=1 - scene.map[node_type.name].fdata[..., 0],
-                                                              kde=False)
-                    eval_heading_err = np.hstack((eval_heading_err, heading_error))
-
-            print(f"Final Displacement Error @{ph * scene.dt}s: {np.mean(eval_fde_batch_errors)}")
-            pd.DataFrame({'error_value': eval_ade_batch_errors, 'error_type': 'ade', 'type': 'mm', 'ph': ph}).to_csv(args.output + '_ade_mm' + str(ph)+'ph' + '.csv')
-            pd.DataFrame({'error_value': eval_fde_batch_errors, 'error_type': 'fde', 'type': 'mm', 'ph': ph}).to_csv(args.output + '_fde_mm' + str(ph)+'ph' + '.csv')
-            pd.DataFrame({'error_value': eval_obs_viols, 'error_type': 'obs', 'type': 'mm', 'ph': ph}).to_csv( args.output + '_obs_mm' + str(ph)+'ph' + '.csv')
+            # pd.DataFrame({'error_value': eval_ade_batch_errors, 'error_type': 'ade', 'type': 'full', 'ph': ph}).to_csv(args.output + '_ade_full_' + str(ph)+'ph' + '.csv')
+            # pd.DataFrame({'error_value': eval_fde_batch_errors, 'error_type': 'fde', 'type': 'full', 'ph': ph}).to_csv(args.output + '_fde_full' + str(ph)+'ph' + '.csv')
+            # pd.DataFrame({'error_value': eval_kde_nll, 'error_type': 'kde', 'type': 'full', 'ph': ph}).to_csv(args.output + '_kde_full' + str(ph)+'ph' + '.csv')
+            # pd.DataFrame({'error_value': eval_obs_viols, 'error_type': 'obs', 'type': 'full', 'ph': ph}).to_csv(args.output + '_obs_full' + str(ph)+'ph' + '.csv')
