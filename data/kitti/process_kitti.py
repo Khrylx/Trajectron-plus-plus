@@ -158,8 +158,8 @@ if __name__ == "__main__":
                 # """past frames for debug""" 
                 most_recent_data = start_data[i].copy()
                 first_data = start_data[i].copy()
-                first_data[0] = ph
-                past_arr = [start_data[i]]
+                first_data[0] = ph - 1
+                past_arr = [first_data]
                 for j in range(1, cfg.past_frames):
                     cur_data = pre_data[j]              # past_data
                     if len(cur_data) > 0 and identity in cur_data[:, 1]:
