@@ -22,6 +22,7 @@ class Node(object):
         self.is_robot = is_robot
         self._last_timestep = None
         self.description = ""
+        self.node_id = None
 
     def __repr__(self):
         return self.type.name

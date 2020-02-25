@@ -15,46 +15,13 @@ from utils import prediction_output_to_trajectories
 from scipy.interpolate import RectBivariateSpline
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--model", help="model full path", type=str, default='../../data/kitti/logs/models_21_Feb_2020_17_48_26')
+parser.add_argument("--model", help="model full path", type=str, default='../../data/kitti/logs/models_23_Feb_2020_19_05_34')
 parser.add_argument("--checkpoint", help="model checkpoint to evaluate", type=int, default=1999)
-parser.add_argument("--data", help="full path to data file", type=str, default='../../data/processed/kitti_val_v1.pkl')
+parser.add_argument("--data", help="full path to data file", type=str, default='../../data/processed/kitti_val_ph10_v1.pkl')
 parser.add_argument("--output", help="full path to output csv file", type=str)
 parser.add_argument("--node_type", help="Node Type to evaluate", type=str, default='VEHICLE')
 parser.add_argument("--prediction_horizon", nargs='+', help="prediction horizon", type=int, default=None)
 args = parser.parse_args()
-
-
-def compute_obs_violations(predicted_trajs, map):
-    obs_map = 1 - map.fdata[..., 0]
-
-    interp_obs_map = RectBivariateSpline(range(obs_map.shape[0]),
-                                         range(obs_map.shape[1]),
-                                         obs_map,
-                                         kx=1, ky=1)
-
-    old_shape = predicted_trajs.shape
-    pred_trajs_map = map.to_map_points(predicted_trajs.reshape((-1, 2)))
-
-    traj_obs_values = interp_obs_map(pred_trajs_map[:, 0], pred_trajs_map[:, 1], grid=False)
-    traj_obs_values = traj_obs_values.reshape((old_shape[0], old_shape[1]))
-    num_viol_trajs = np.sum(traj_obs_values.max(axis=1) > 0, dtype=float)
-
-    return num_viol_trajs
-
-def compute_heading_error(prediction_output_dict, dt, max_hl, ph, node_type_enum, kde=True, obs=False, map=None):
-
-    heading_error = list()
-
-    for t in prediction_output_dict.keys():
-        for node in prediction_output_dict[t].keys():
-            if node.type.name == 'VEHICLE':
-                gt_vel = node.get(t + ph - 1, {'velocity': ['x', 'y']})[0]
-                gt_heading = np.arctan2(gt_vel[1], gt_vel[0])
-                our_heading = np.arctan2(prediction_output_dict[t][node][..., -2, 1], prediction_output_dict[t][node][..., -2,  0])
-                he = np.mean(np.abs(gt_heading - our_heading)) % (2 * np.pi)
-                heading_error.append(he)
-
-    return heading_error
 
 
 def load_model(model_dir, env, ts=99):

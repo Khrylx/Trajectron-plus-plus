@@ -257,6 +257,7 @@ if __name__ == "__main__":
                     node = Node(type=node_df.iloc[0]['type'])
                 else:
                     node = BicycleNode(type=node_df.iloc[0]['type'])
+                node.node_id = node_id
                 node.first_timestep = node_df['frame_id'].iloc[0]
                 node.position = Position(node_df['x'].values, node_df['y'].values)
                 node.velocity = Velocity.from_position(node.position, scene.dt)
