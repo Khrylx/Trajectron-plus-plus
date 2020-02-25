@@ -17,8 +17,9 @@ from scipy.interpolate import RectBivariateSpline
 parser = argparse.ArgumentParser()
 parser.add_argument("--model", help="model full path", type=str, default='../../data/kitti/logs/models_23_Feb_2020_19_05_34')
 parser.add_argument("--checkpoint", help="model checkpoint to evaluate", type=int, default=1999)
+parser.add_argument("--sample_num", type=int, default=20)
 parser.add_argument("--data", help="full path to data file", type=str, default='../../data/processed/kitti_val_ph10_v1.pkl')
-parser.add_argument("--output", help="full path to output csv file", type=str)
+parser.add_argument("--output", help="output_folder", type=str, default='~/results/trajectron++')
 parser.add_argument("--node_type", help="Node Type to evaluate", type=str, default='VEHICLE')
 parser.add_argument("--prediction_horizon", nargs='+', help="prediction horizon", type=int, default=None)
 args = parser.parse_args()
@@ -40,6 +41,34 @@ def load_model(model_dir, env, ts=99):
     return stg, hyperparams
 
 
+def save_predictions(prediction_output_dict, scene, max_hl, ph):
+
+    (prediction_dict,
+     _,
+     futures_dict) = prediction_output_to_trajectories(prediction_output_dict, scene.dt, max_hl, ph)
+
+    prediction_dict = prediction_dict[max_hl]
+    futures_dict = futures_dict[max_hl]
+
+    seq, frame = scene.name.split('_')
+    frame = int(frame)
+    save_dir = os.path.join(output_dir, seq, f'frame_{frame:06d}')
+    os.makedirs(save_dir, exist_ok=True)
+    for i in range(args.sample_num):
+        results = []
+        nodes = list(prediction_dict.keys())
+        nodes.sort(key=lambda x: x.node_id)
+        for node in nodes:
+            node_id = node.node_id
+            pred = prediction_dict[node][i]
+            pred = np.hstack([np.arange(ph)[:, None] + frame + 1, np.ones((ph, 1)) * node_id, pred])
+            results.append(pred)
+        results = np.concatenate(results, axis=0)
+        np.savetxt(f'{save_dir}/sample_{i:03d}.txt', results, fmt="%.3f")
+    return
+
+
+
 if __name__ == "__main__":
     with open(args.data, 'rb') as f:
         env = pickle.load(f, encoding='latin1')
@@ -57,6 +86,9 @@ if __name__ == "__main__":
     if args.prediction_horizon is None:
         args.prediction_horizon = [hyperparams['prediction_horizon']]
 
+    output_dir = os.path.join(os.path.expanduser(args.output), os.path.basename(args.model))
+    os.makedirs(output_dir, exist_ok=True)
+
     for ph in args.prediction_horizon:
         print(f"Prediction Horizon: {ph}")
         max_hl = hyperparams['maximum_history_length']
@@ -71,36 +103,20 @@ if __name__ == "__main__":
             eval_obs_viols = np.array([])
             print("-- Evaluating Full")
             for i, scene in enumerate(tqdm(scenes)):
-                for timestep in range(scene.timesteps):
-                    predictions = eval_stg.predict(scene,
-                                                   np.array([timestep]),
-                                                   ph,
-                                                   num_samples_z=2000,
-                                                   most_likely_z=False,
-                                                   min_future_timesteps=ph)
+                timestep = hyperparams['maximum_history_length']
+                predictions = eval_stg.predict(scene,
+                                                np.array([timestep]),
+                                                ph,
+                                                num_samples_z=args.sample_num,
+                                                most_likely_z=False,
+                                                min_future_timesteps=ph)
 
-                    if not predictions:
-                        continue
+                if not predictions:
+                    continue
 
-                    eval_error_dict = evaluation.compute_batch_statistics(predictions,
-                                                                          scene.dt,
-                                                                          node_type_enum=env.NodeType,
-                                                                          max_hl=max_hl,
-                                                                          ph=ph,
-                                                                          map=None,
-                                                                          obs=False)
+                save_predictions(predictions,
+                                    scene,
+                                    max_hl=max_hl,
+                                    ph=ph)
 
-                    eval_ade_batch_errors = np.hstack((eval_ade_batch_errors, eval_error_dict[node_type]['ade']))
-                    eval_fde_batch_errors = np.hstack((eval_fde_batch_errors, eval_error_dict[node_type]['fde']))
-                    eval_kde_nll = np.hstack((eval_kde_nll, eval_error_dict[node_type]['kde']))
-                    eval_obs_viols = np.hstack((eval_obs_viols, eval_error_dict[node_type]['obs_viols']))
-
-                    del predictions
-                    del eval_error_dict
-
-            print(f"Final Mean Displacement Error @{ph * scene.dt}s: {np.mean(eval_fde_batch_errors)}")
-            print(f"Road Violations @{ph * scene.dt}s: {100 * np.sum(eval_obs_viols) / (eval_obs_viols.shape[0] * 2000)}%")
-            # pd.DataFrame({'error_value': eval_ade_batch_errors, 'error_type': 'ade', 'type': 'full', 'ph': ph}).to_csv(args.output + '_ade_full_' + str(ph)+'ph' + '.csv')
-            # pd.DataFrame({'error_value': eval_fde_batch_errors, 'error_type': 'fde', 'type': 'full', 'ph': ph}).to_csv(args.output + '_fde_full' + str(ph)+'ph' + '.csv')
-            # pd.DataFrame({'error_value': eval_kde_nll, 'error_type': 'kde', 'type': 'full', 'ph': ph}).to_csv(args.output + '_kde_full' + str(ph)+'ph' + '.csv')
-            # pd.DataFrame({'error_value': eval_obs_viols, 'error_type': 'obs', 'type': 'full', 'ph': ph}).to_csv(args.output + '_obs_full' + str(ph)+'ph' + '.csv')
+                del predictions
