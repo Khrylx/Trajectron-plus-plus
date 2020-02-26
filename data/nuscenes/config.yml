@@ -1,0 +1,102 @@
+# ------------------- General Options -------------------------
+description                  : GNNTrkForecast
+seed                         : 100   
+dataset                      : KITTI
+# data_root_kitti              : /mnt/hdd2/xinshuo/datasets/KITTI/tracking
+# data_root_kitti              : /home/yyuan2/datasets/KITTI/tracking
+data_root_nuscenes           : /home/yyuan2/datasets/nuScenes/data/produced/kitti_format/tracking
+
+# ------------------- Feature Extractor -------------------------
+
+past_frames                  : 2
+future_frames                : 2
+
+# for person
+# resize_h                     : 84
+# resize_w                     : 32
+
+# for car
+# resize_h                     : 56
+# resize_w                     : 84
+
+traj_scale                   : 10
+relative                     : false
+
+# ------------------- GNN -------------------------
+
+gnn_layers                   : 1
+
+# ------------------- VAE-------------------------
+
+nz                           : 32
+feat_dim                     : 64
+nh_mlp                       : [300, 200]
+rnn_type                     : gru
+use_drnn_mlp                 : true
+
+# ------------------- DSF -------------------------
+
+nk                           : 10
+dsf_q_scale                  : 1.0
+dsf_d_scale                  : 0.1
+dsf_rho                      : 0.9
+dsf_lambda_recon             : 0.1    
+dsf_lr                       : 1.e-3
+dsf_vae_epoch                : 0
+num_dsf_epochs               : 20
+dsf_epochs_fix               : 10
+dsf_save_freq                : 1
+
+# ------------------- Training Parameters -------------------------
+
+# optimization
+# optimizer                    : Adam
+# gammas                       : [0.1, 0.1, 0.1]
+# schedule                     : [5, 10, 15]
+# learning_rate                : 0.001
+# momentum                     : 0.9
+# decay                        : 0.0005
+lr                           : 1.e-3
+beta                         : 0.01
+sample_k                     : 20
+kld_min                      : 10
+lambda_sample                : 1.0
+lambda_forecast              : 1.0
+lambda_trk                   : 0
+
+# training miscell
+num_epochs                   : 50
+lr_fix_epochs                : 10
+print_freq                   : 20
+model_save_freq              : 1
+# save_dir                     : /mnt/hdd2/xinshuo/models/GNNTrkForecast
+save_dir                     : /home/yyuan2/results/gnntrk_forecast
+purturb_ratio                : 0.0
+# purturb_ratio                : 0
+# drop_ratio_train             : 0.5
+mask                         : false
+
+# ------------------- Testing Parameters -------------------------
+
+# test_split                   : val
+# test_split                   : test
+
+# # tracking buffer
+# BirthCount                   : 4
+# DeathCount                   : 10
+# DeathPreserve                : 0
+
+# model parameters
+# use_layer                    : 0
+# drop_ratio_test              : 0
+
+# model_checkpoint             : 20191031_23h45m54s_mot15_trainval/gnn_tracking_MOT15_epoch20.pth
+
+# model_checkpoint             : 20191031_23h46m04s_mot16_trainval/gnn_tracking_MOT16_epoch20.pth
+
+# model_checkpoint             : 20191031_23h46m11s_mot17_trainval/gnn_tracking_MOT17_epoch20.pth
+
+# model_checkpoint             : 20191031_23h47m38s_mot19_purturb0.2/gnn_tracking_MOT19_epoch20.pth
+
+model_checkpoint             : test
+# --------------------------- End ---------------------------
