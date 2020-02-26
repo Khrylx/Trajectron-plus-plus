@@ -8,8 +8,8 @@ data_root_kitti              : /home/yyuan2/datasets/KITTI/tracking
 
 # ------------------- Feature Extractor -------------------------
 
-past_frames                  : 10
-future_frames                : 10
+past_frames                  : 30
+future_frames                : 30
 
 # for person
 # resize_h                     : 84
