@@ -1,7 +1,7 @@
 # ------------------- General Options -------------------------
 description                  : GNNTrkForecast
 seed                         : 100   
-dataset                      : KITTI
+dataset                      : nuscenes
 # data_root_kitti              : /mnt/hdd2/xinshuo/datasets/KITTI/tracking
 # data_root_kitti              : /home/yyuan2/datasets/KITTI/tracking
 data_root_nuscenes           : /home/yyuan2/datasets/nuScenes/data/produced/kitti_format/tracking

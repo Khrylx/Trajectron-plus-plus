@@ -3,8 +3,8 @@
 
 import os, random, numpy as np, copy
 
-from .preprocessor import preprocess_3d
-from .nuscenes_split import get_split
+from preprocessor import preprocess_3d
+from nuscenes_split import get_split
 from utils.utils import FindMatch
 from xinshuo_miscellaneous import print_log
 

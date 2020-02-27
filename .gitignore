@@ -1,4 +1,6 @@
 __pycache__
 .vscode
 logs
-data/kitti/*.txt
+data/**/*.txt
+data/processed/nuscenes_train_ph2_v1.pkl
+data/processed/nuscenes_val_ph2_v1.pkl
