@@ -15,10 +15,10 @@ from utils import prediction_output_to_trajectories
 from scipy.interpolate import RectBivariateSpline
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--model", help="model full path", type=str, default='../../data/nuscenes/logs/models_26_Feb_2020_23_24_04')
+parser.add_argument("--model", help="model full path", type=str, default='../../data/nuscenes/logs/models_27_Feb_2020_18_32_09')
 parser.add_argument("--checkpoint", help="model checkpoint to evaluate", type=int, default=1999)
 parser.add_argument("--sample_num", type=int, default=20)
-parser.add_argument("--data", help="full path to data file", type=str, default='../../data/processed/nuscenes_val_ph2_v1.pkl')
+parser.add_argument("--data", help="full path to data file", type=str, default='../../data/processed/nuscenes_val_ph6_v1.pkl')
 parser.add_argument("--output", help="output_folder", type=str, default='~/results/trajectron++')
 parser.add_argument("--node_type", help="Node Type to evaluate", type=str, default='VEHICLE')
 parser.add_argument("--prediction_horizon", nargs='+', help="prediction horizon", type=int, default=None)
